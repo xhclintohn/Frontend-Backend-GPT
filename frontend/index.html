@@ -692,4 +692,274 @@
             <div class="theme-toggle" onclick="toggleTheme()">
                 <div class="switch"><i class="fas fa-moon"></i></div>
             </div>
-            <div class="c
+            <div class="chat-area" id="chatArea">
+                <div class="message ai-message">
+                    Welcome to ClintGPT! I'm your interstellar AI, ready to tackle any query from across the galaxy. Ask away, upload images, or generate visuals!
+                    <div class="timestamp">10:42 PM EAT, Jun 07, 2025</div>
+                    <button class="copy-btn" onclick="copyMessage(this)">
+                        <i class="fas fa-copy"></i>
+                        <span class="copy-tooltip">Copy</span>
+                    </button>
+                </div>
+            </div>
+            <div class="input-area">
+                <input type="text" id="userInput" placeholder="Query the cosmos with ClintGPT...">
+                <input type="file" id="imageInput" accept="image/*">
+                <button onclick="sendMessage()">
+                    <i class="fas fa-paper-plane"></i> Send
+                    <span class="tooltip">Transmit your query</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatArea = document.getElementById('chatArea');
+        const userInput = document.getElementById('userInput');
+        const imageInput = document.getElementById('imageInput');
+        const chatHistory = document.getElementById('chatHistory');
+        let chatId = 1;
+
+        function getTimestamp() {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit' });
+            const date = now.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+            return `${time} EAT, ${date}`;
+        }
+
+        function typeMessage(element, text, callback) {
+            let i = 0;
+            element.textContent = '';
+            const speed = 20;
+            function type() {
+                if (i < text.length) {
+                    element.textContent += text.charAt(i);
+                    i++;
+                    scrollToBottom();
+                    setTimeout(type, speed);
+                } else {
+                    callback();
+                }
+            }
+            type();
+        }
+
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+            chatHistory.innerHTML = '';
+            history.forEach((entry, index) => {
+                const item = document.createElement('div');
+                const msgCount = entry.messages.length;
+                item.innerHTML = `<i class="fas fa-comment"></i> Chat ${index + 1}: ${entry.firstMessage.substring(0, 20)}... (${msgCount} msgs, ${entry.timestamp})`;
+                item.onclick = () => loadChat(entry.messages);
+                chatHistory.appendChild(item);
+            });
+        }
+
+        function saveChat() {
+            const messages = Array.from(chatArea.children).map(msg => {
+                const isCode = msg.classList.contains('code-message');
+                const isImage = msg.classList.contains('image-message');
+                return {
+                    text: isCode ? msg.textContent.trim() : isImage ? msg.querySelector('img')?.src : msg.childNodes[0].textContent.trim(),
+                    type: msg.classList.contains('user-message') ? 'user' : msg.classList.contains('alert') ? 'alert' : isCode ? 'code' : isImage ? 'image' : 'ai',
+                    timestamp: msg.querySelector('.timestamp')?.textContent || getTimestamp()
+                };
+            });
+            const history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+            const newEntry = {
+                firstMessage: messages[1]?.text || 'New Chat',
+                timestamp: getTimestamp(),
+                messages: messages
+            };
+            history.push(newEntry);
+            localStorage.setItem('chatHistory', JSON.stringify(history));
+            const msgCount = newEntry.messages.length;
+            const item = document.createElement('div');
+            item.innerHTML = `<i class="fas fa-comment"></i> Chat ${chatId++}: ${newEntry.firstMessage.substring(0, 20)}... (${msgCount} msgs, ${newEntry.timestamp})`;
+            item.onclick = () => loadChat(newEntry.messages);
+            chatHistory.appendChild(item);
+        }
+
+        function loadChat(messages) {
+            chatArea.innerHTML = '';
+            messages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `message ${msg.type === 'user' ? 'user-message' : msg.type === 'alert' ? 'alert' : msg.type === 'code' ? 'code-message' : msg.type === 'image' ? 'image-message' : 'ai-message'}`;
+                if (msg.type === 'image') {
+                    div.innerHTML = `<img src="${msg.text}" alt="Generated Image"><div class="timestamp">${msg.timestamp}</div>`;
+                } else {
+                    div.innerHTML = `${msg.text}<div class="timestamp">${msg.timestamp}</div>`;
+                }
+                if (msg.type !== 'alert') {
+                    div.innerHTML += `<button class="copy-btn" onclick="copyMessage(this)"><i class="fas fa-copy"></i><span class="copy-tooltip">Copy</span></button>`;
+                }
+                chatArea.appendChild(div);
+            });
+            scrollToBottom();
+        }
+
+        function newChat() {
+            chatArea.innerHTML = `<div class="message ai-message">Welcome to ClintGPT! I'm your interstellar AI, ready to tackle any query from across the galaxy. Ask away, upload images, or generate visuals!<div class="timestamp">${getTimestamp()}</div><button class="copy-btn" onclick="copyMessage(this)"><i class="fas fa-copy"></i><span class="copy-tooltip">Copy</span></button></div>`;
+            userInput.value = '';
+            imageInput.value = '';
+            scrollToBottom();
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('chatHistory');
+            chatHistory.innerHTML = '';
+            chatId = 1;
+            newChat();
+        }
+
+        function toggleTheme() {
+            const body = document.body;
+            const switchIcon = document.querySelector('.switch i');
+            if (body.classList.contains('dark')) {
+                body.classList.remove('dark');
+                body.classList.add('light');
+                switchIcon.classList.remove('fa-moon');
+                switchIcon.classList.add('fa-sun');
+            } else {
+                body.classList.remove('light');
+                body.classList.add('dark');
+                switchIcon.classList.remove('fa-sun');
+                switchIcon.classList.add('fa-moon');
+            }
+        }
+
+        function copyMessage(button) {
+            const message = button.parentElement;
+            const text = message.classList.contains('image-message') ? message.querySelector('img').src : message.childNodes[0].textContent.trim();
+            navigator.clipboard.writeText(text);
+            button.innerHTML = '<i class="fas fa-check"></i><span class="copy-tooltip">Copied ✓</span>';
+            setTimeout(() => {
+                button.innerHTML = '<i class="fas fa-copy"></i><span class="copy-tooltip">Copy</span>';
+            }, 3500);
+        }
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            const image = imageInput.files[0];
+
+            if (!message && !image) {
+                const alert = document.createElement('div');
+                alert.className = 'message alert';
+                alert.innerHTML = `Please provide a message or image to transmit...<div class="timestamp">${getTimestamp()}</div>`;
+                chatArea.appendChild(alert);
+                scrollToBottom();
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    setTimeout(() => chatArea.removeChild(alert), 500);
+                }, 3000);
+                return;
+            }
+
+            if (message) {
+                const userMsg = document.createElement('div');
+                userMsg.className = 'message user-message';
+                userMsg.innerHTML = `${message}<div class="timestamp">${getTimestamp()}</div><button class="copy-btn" onclick="copyMessage(this)"><i class="fas fa-copy"></i><span class="copy-tooltip">Copy</span></button>`;
+                chatArea.appendChild(userMsg);
+                scrollToBottom();
+            }
+
+            const loading = document.createElement('div');
+            loading.className = 'message loading';
+            loading.innerHTML = '<div class="spinner"></div> ClintGPT is computing...';
+            chatArea.appendChild(loading);
+            scrollToBottom();
+
+            try {
+                const formData = new FormData();
+                if (image) {
+                    formData.append('image', image);
+                }
+                if (message) {
+                    formData.append('query', message);
+                }
+
+                const response = await fetch('https://clintgpt.vercel.app/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer clintgpt-secret-123'
+                    },
+                    body: formData
+                });
+                const data = await response.json();
+                chatArea.removeChild(loading);
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch AI response');
+                }
+
+                if (data.result && data.result.startsWith('http')) {
+                    const aiMsg = document.createElement('div');
+                    aiMsg.className = 'message image-message';
+                    aiMsg.innerHTML = `<img src="${data.result}" alt="Generated Image"><div class="timestamp">${getTimestamp()}</div><button class="copy-btn" onclick="copyMessage(this)"><i class="fas fa-copy"></i><span class="copy-tooltip">Copy</span></button>`;
+                    chatArea.appendChild(aiMsg);
+                } else if (message && (message.toLowerCase().includes('javascript') || message.toLowerCase().includes('python'))) {
+                    const parts = data.msg.split('```');
+                    if (parts.length > 1) {
+                        const descMsg = document.createElement('div');
+                        descMsg.className = 'message ai-message';
+                        descMsg.innerHTML = `${parts[0].trim()}<div class="timestamp">${getTimestamp()}</div><button class="copy-btn" onclick="copyMessage(this)"><i class="fas fa-copy"></i><span class="copy-tooltip">Copy</span></button>`;
+                        chatArea.appendChild(descMsg);
+
+                        const codeMsg = document.createElement('div');
+                        codeMsg.className = 'message code-message';
+                        codeMsg.innerHTML = `${parts[1].trim()}<div class="timestamp">${getTimestamp()}</div><button class="copy-btn" onclick="copyMessage(this)"><i class="fas fa-copy"></i><span class="copy-tooltip">Copy</span></button>`;
+                        chatArea.appendChild(codeMsg);
+                    } else {
+                        const aiMsg = document.createElement('div');
+                        aiMsg.className = 'message ai-message';
+                        chatArea.appendChild(aiMsg);
+                        typeMessage(aiMsg, data.msg, () => {
+                            aiMsg.innerHTML += `<div class="timestamp">${getTimestamp()}</div><button class="copy-btn" onclick="copyMessage(this)"><i class="fas fa-copy"></i><span class="copy-tooltip">Copy</span></button>`;
+                            scrollToBottom();
+                            saveChat();
+                        });
+                    }
+                } else {
+                    const aiMsg = document.createElement('div');
+                    aiMsg.className = 'message ai-message';
+                    chatArea.appendChild(aiMsg);
+                    typeMessage(aiMsg, data.msg, () => {
+                        aiMsg.innerHTML += `<div class="timestamp">${getTimestamp()}</div><button class="copy-btn" onclick="copyMessage(this)"><i class="fas fa-copy"></i><span class="copy-tooltip">Copy</span></button>`;
+                        scrollToBottom();
+                        saveChat();
+                    });
+                }
+                scrollToBottom();
+                saveChat();
+            } catch (error) {
+                chatArea.removeChild(loading);
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'message ai-message';
+                aiMsg.innerHTML = `Error: ${error.message}<div class="timestamp">${getTimestamp()}</div><button class="copy-btn" onclick="copyMessage(this)"><i class="fas fa-copy"></i><span class="copy-tooltip">Copy</span></button>`;
+                chatArea.appendChild(aiMsg);
+                scrollToBottom();
+                saveChat();
+            }
+
+            userInput.value = '';
+            imageInput.value = '';
+        }
+
+        function scrollToBottom() {
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        userInput.addEventListener('input', () => {
+            scrollToBottom();
+        });
+
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        loadHistory();
+        scrollToBottom();
+    </script>
+</body>
+</html>
